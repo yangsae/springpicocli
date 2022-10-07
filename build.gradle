@@ -1,0 +1,83 @@
+plugins {
+    id 'org.springframework.boot' version '2.7.4'
+    id 'io.spring.dependency-management' version '1.0.14.RELEASE'
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'org.graalvm.buildtools.native' version '0.9.14'
+}
+
+group = 'dev.yangsae'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '11'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'info.picocli:picocli-spring-boot-starter:4.6.3'
+    implementation 'org.springframework.boot:spring-boot-starter-mail:2.7.4'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+compileJava {
+    options.compilerArgs += ["-Aproject=${project.group}/${project.name}"]
+}
+
+jar {
+    finalizedBy shadowJar
+    manifest {
+        attributes('Main-Class': 'dev.yangsae.springpicocli.SpringPicocliApplication')
+    }
+}
+
+graalvmNative {
+    // Reference: https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html#configuration-options
+    agent {
+        // 'agent' means 'native-image-agent' which is provided by GraalVM
+        defaultMode = "standard"
+        enabled = true
+        modes {
+            standard {
+            }
+        }
+
+        builtinCallerFilter = true
+        builtinHeuristicFilter = true
+        enableExperimentalPredefinedClasses = false
+        enableExperimentalUnsafeAllocationTracing = false
+        trackReflectionMetadata = true
+
+        metadataCopy {
+            outputDirectories.add("src/main/resources/META-INF/native-image")
+            mergeWithExisting = true
+        }
+    }
+
+    binaries {
+        main {
+            javaLauncher = javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(17)
+                vendor = JvmVendorSpec.matching("GraalVM Community")
+            }
+            mainClass = 'dev.yangsae.springpicocli.SpringPicocliApplication'
+            debug = true
+            verbose = true
+// 'useFatJar' makes the following error, but was not able to find right answer from
+//   References: https://github.com/edvin/tornadofx-idea-plugin/issues/18, https://stackoverflow.com/a/14441628
+// "Fatal error: java.lang.SecurityException: Invalid signature file digest for Manifest main attributes"
+//            useFatJar = true
+        }
+    }
+}
+
+tasks.register('printVersion') {
+    doLast {
+        println project.version
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
